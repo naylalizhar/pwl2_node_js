@@ -5,12 +5,21 @@ import ejs from 'ejs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import bodyParser from 'body-parser';
+import methodOverride from 'method-override';
+import bcrypt from 'bcrypt';
+
 const app = express();
 const PORT = 3000;
 
 // Tentukan __filename dan __dirname secara manual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Set folder 'public' untuk file statis (CSS, JS)
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(methodOverride('_method'));
 
 // Set folder `public` untuk file statis (CSS, JS)
 app.use(express.static(path.join(__dirname, 'public')));
@@ -40,3 +49,101 @@ app.get('/users', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running at http://127.0.0.1:${PORT}`);
 });
+
+//from tambah pengguna
+app.get('/users/create', (req, res) => {
+    res.render('user_create');
+});
+// Tampilkan Detail Pengguna
+app.get('/users/:id', async (req, res) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/users/${req.params.id}`);
+      const user = await response.json();
+      res.render('user_show', { user: user });
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      res.status(500).send('Error fetching user');
+    }
+  });
+  
+  // Tambah Pengguna
+app.post('/users', async (req, res) => {
+    try {
+        const hashedPassword = await bcrypt.hash(req.body.password, 10); // Hash password
+        
+        const response = await fetch('http://localhost:8000/api/users', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: req.body.name,
+                email: req.body.email,
+                password: hashedPassword
+            })
+        });
+
+        res.redirect('/users');
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).send('Error creating user');
+    }
+});
+
+//forn edit pengguna
+// Rute untuk menampilkan halaman edit pengguna
+app.get('/users/:id/edit', async (req, res) => {
+    try {
+        const response = await fetch(`http://localhost:8000/api/users/${req.params.id}`);
+        const user = await response.json();
+        res.render('user_update', { user: user });
+    } catch (error) {
+        console.error('Error fetching user:', error);
+        res.status(500).send('Error fetching user');
+    }
+});
+
+
+// Edit Pengguna
+app.put('/users/:id', async (req, res) => {
+    try {
+        const dataToUpdate = {
+            name: req.body.name,
+            email: req.body.email
+        };
+
+        if (req.body.password) {
+            const hashedPassword = await bcrypt.hash(req.body.password, 10); // Hash jika password diisi
+            dataToUpdate.password = hashedPassword;
+        }
+
+        await fetch(`http://localhost:8000/api/users/${req.params.id}`, {
+            method: 'PUT',
+            headers: {
+                // 'Authorization': API_TOKEN,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dataToUpdate)
+        });
+        res.redirect('/users');
+    } catch (error) {
+        console.error('Error updating user:', error)
+        res.status(500).send('error updating user');
+    }
+    });
+        
+    //hapus pengguna
+    app.delete('/users/:id', async (req, res) => {
+        try {
+            await fetch(`http://localhost:8000/api/users/${req.params.id}`, {
+                method: 'DELETE',
+            
+                    // 'headers': API_TOKEN
+                });
+            res.redirect('/users'); 
+        }catch (error) {
+            console.error('Error deleting user:', error)
+            res.status(500).send('error deletinhg user');
+        }
+    });
+    
